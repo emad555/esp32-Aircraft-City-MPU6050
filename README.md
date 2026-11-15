@@ -1,6 +1,6 @@
 # ESP32 + MPU6050 tilt games
 
-Five desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city. **Orbital Salvage** is a top-down arena collection game. **Neon City Escape** is a driving mission with a police chase. **Gyro Forge** uses tilt as gravity, twist to turn a shield, and shake for a defensive pulse. **Prism Sync 3D** uses the full motion sensor to align a rotating 3D cube with a target pose, then lock it with a shake. All five games also have keyboard controls.
+Six desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city. **Orbital Salvage** is a top-down arena collection game. **Neon City Escape** is a driving mission with a police chase. **Gyro Forge** uses tilt as gravity, twist to turn a shield, and shake for a defensive pulse. **Prism Sync 3D** uses the full motion sensor to align a rotating 3D cube with a target pose. **Flappy MPU** is a shake-to-flap pipe run with tilt-assisted gliding. All six games also have keyboard controls.
 
 | Skyline Flight | Orbital Salvage |
 | --- | --- |
@@ -11,6 +11,8 @@ Five desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** i
 ![Gyro Forge preview](gyro-forge-preview.png)
 
 ![Prism Sync 3D preview](prism-sync-preview.png)
+
+![Flappy MPU preview](flappy-preview.png)
 
 ## Hardware and wiring
 
@@ -30,7 +32,7 @@ Use **3.3 V** so the I2C lines stay safe for the ESP32. For another ESP32 varian
 1. Install Arduino IDE and the **esp32 by Espressif Systems** board package.
 2. In Library Manager install **Adafruit MPU6050** and **Adafruit Unified Sensor**. Install **Adafruit BusIO** if prompted.
 3. Open `esp32-Aircraft-City-MPU6050.ino`, select your board and USB port, and upload.
-4. Keep the controller level and still for the first second after reset. You may verify `READY,MPU6050`, `IMU,roll,pitch`, and `MOTION,roll,pitch,yaw,shock` lines in Serial Monitor at **115200 baud**. **Close Serial Monitor before starting a game**, because only one program can own the port. Re-upload this updated sketch to use Gyro Forge's and Prism Sync 3D's twist and shake controls.
+4. Keep the controller level and still for the first second after reset. You may verify `READY,MPU6050`, `IMU,roll,pitch`, and `MOTION,roll,pitch,yaw,shock` lines in Serial Monitor at **115200 baud**. **Close Serial Monitor before starting a game**, because only one program can own the port. Re-upload this updated sketch to use Gyro Forge's, Prism Sync 3D's, and Flappy MPU's shake controls.
 
 ## Run the games
 
@@ -43,7 +45,7 @@ python -m pip install -r requirements.txt
 python game.py
 ```
 
-Run `python salvage.py` for Orbital Salvage, `python city_escape.py` for Neon City Escape, `python gyro_forge.py` for Gyro Forge, or `python prism_sync.py` for Prism Sync 3D. All five games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
+Run `python salvage.py` for Orbital Salvage, `python city_escape.py` for Neon City Escape, `python gyro_forge.py` for Gyro Forge, `python prism_sync.py` for Prism Sync 3D, or `python flappy_imu.py` for Flappy MPU. All six games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
 
 If auto-detection does not find your ESP32, specify its port (look in Arduino IDE or Windows Device Manager):
 
@@ -51,7 +53,7 @@ If auto-detection does not find your ESP32, specify its port (look in Arduino ID
 python game.py --port COM5
 ```
 
-Use `python salvage.py --port COM5`, `python city_escape.py --port COM5`, `python gyro_forge.py --port COM5`, or `python prism_sync.py --port COM5` for the other games. All five accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
+Use `python salvage.py --port COM5`, `python city_escape.py --port COM5`, `python gyro_forge.py --port COM5`, `python prism_sync.py --port COM5`, or `python flappy_imu.py --port COM5` for the other games. All six accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
 
 On Linux or macOS, use `python3 -m venv .venv`, activate with `source .venv/bin/activate`, and pass a port such as `/dev/ttyUSB0` or `/dev/cu.usbserial-...` if needed. Python 3.10 or newer is recommended.
 
@@ -136,7 +138,23 @@ The cyan cube follows the MPU6050's roll and pitch. Twist the board in its own p
 
 Run `python prism_sync.py`. Use `--invert-yaw` if the twist direction feels backward, or adjust `--shake-threshold 3.0` if needed. The 3D cubes are projected and drawn by Pygame; no extra graphics library is required.
 
-The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` and `MOTION,<roll degrees>,<pitch degrees>,<yaw degrees/second>,<shake m/s²>` about 50 times per second. The `IMU` packet keeps the first three games compatible; Gyro Forge and Prism Sync 3D read the extra motion values. Sending `C` resets tilt center and gyro bias. The sketch's left/right roll direction is reversed with `ROLL_DIRECTION = -1.0`. The games reconnect automatically if the board is unplugged and reconnected.
+## Play Flappy MPU
+
+Shake the controller once to start and flap. Time further shakes to fly through the openings in the green pipes. Tilt forward/back to adjust how quickly the bird falls, and tilt left/right to move it a short distance horizontally. A gold feather appears in every fourth pipe opening; collecting it gives a one-hit shield and two bonus points. After a crash, shake again to restart.
+
+| Action | MPU6050 / keyboard |
+| --- | --- |
+| Flap / start / restart after crash | Quick shake / `Space` |
+| Glide and steer | Tilt forward/back and left/right / `W` `A` `S` `D` or arrows |
+| Recenter | Hold the board level and press `C` |
+| Pause / resume | `P` |
+| Restart from the beginning | `R` |
+| Mute / unmute | `M` |
+| Quit | `Esc` |
+
+Run `python flappy_imu.py`. The `--shake-threshold` option changes how strong a shake is needed, for example `python flappy_imu.py --shake-threshold 3.0`. Flappy MPU uses the newer `MOTION,...` serial packet for shake detection; the keyboard fallback still works without an ESP32.
+
+The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` and `MOTION,<roll degrees>,<pitch degrees>,<yaw degrees/second>,<shake m/s²>` about 50 times per second. The `IMU` packet keeps the first three games compatible; Gyro Forge, Prism Sync 3D, and Flappy MPU read the extra motion values. Sending `C` resets tilt center and gyro bias. The sketch's left/right roll direction is reversed with `ROLL_DIRECTION = -1.0`. The games reconnect automatically if the board is unplugged and reconnected.
 
 ## Troubleshooting
 
@@ -146,8 +164,8 @@ The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<
 | Sketch reports MPU6050 not found | Recheck 3V3, GND, SDA 21, SCL 22; ensure the board and module share ground. |
 | Aircraft drifts | Hold the controller neutral and press `C`. |
 | Controls are backward | Use `--invert-roll` or `--invert-pitch`. |
-| Gyro Forge or Prism Sync 3D has tilt but no twist or shake | Re-upload the updated sketch and check for `MOTION,...` lines in Serial Monitor, then close the monitor. |
+| A motion game has tilt but no twist or shake | Re-upload the updated sketch and check for `MOTION,...` lines in Serial Monitor, then close the monitor. |
 | Shake pulse triggers too often or not at all | Watch the shake value at the bottom of Gyro Forge and adjust `--shake-threshold`. |
 | Python says `No module named pygame` | Activate the virtual environment and run `python -m pip install -r requirements.txt`. |
 
-No Wi-Fi setup is needed. All five games draw their graphics with Pygame.
+No Wi-Fi setup is needed. All six games draw their graphics with Pygame.
