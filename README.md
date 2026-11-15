@@ -1,10 +1,12 @@
 # ESP32 + MPU6050 tilt games
 
-Two desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city: collect gold rings and avoid buildings and drones. **Orbital Salvage** is a top-down arena game: collect 15 energy cores before the 90-second timer expires while dodging moving mines. Both games also work with a keyboard, so you can try them before connecting hardware.
+Three desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city: collect gold rings and avoid buildings and drones. **Orbital Salvage** is a top-down arena game: collect 15 energy cores before the 90-second timer expires while dodging moving mines. **Neon City Escape** is a top-down driving mission: take a car, collect packages, and reach a garage while police chase you. All three games also work with a keyboard, so you can try them before connecting hardware.
 
 | Skyline Flight | Orbital Salvage |
 | --- | --- |
 | ![Skyline Flight preview](preview.png) | ![Orbital Salvage preview](salvage-preview.png) |
+
+![Neon City Escape preview](city-escape-preview.png)
 
 ## Hardware and wiring
 
@@ -37,7 +39,7 @@ python -m pip install -r requirements.txt
 python game.py
 ```
 
-For the second game, run `python salvage.py` from the same folder. Both games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
+Run `python salvage.py` for Orbital Salvage or `python city_escape.py` for Neon City Escape. All three games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
 
 If auto-detection does not find your ESP32, specify its port (look in Arduino IDE or Windows Device Manager):
 
@@ -45,7 +47,7 @@ If auto-detection does not find your ESP32, specify its port (look in Arduino ID
 python game.py --port COM5
 ```
 
-Use `python salvage.py --port COM5` for Orbital Salvage. Both games accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
+Use `python salvage.py --port COM5` or `python city_escape.py --port COM5` for the other games. All three accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
 
 On Linux or macOS, use `python3 -m venv .venv`, activate with `source .venv/bin/activate`, and pass a port such as `/dev/ttyUSB0` or `/dev/cu.usbserial-...` if needed. Python 3.10 or newer is recommended.
 
@@ -77,6 +79,23 @@ Tilt the controller left/right and forward/back to move the drone around the are
 
 Keyboard input overrides the sensor on each axis while a key is held. Orbital Salvage creates its graphics and sound effects in code; no extra assets are needed to play.
 
+## Play Neon City Escape
+
+Walk to the gold car and press `E` to enter. Tilt forward to accelerate and left/right to steer. Follow the gold waypoint and minimap to collect three packages, then drive to the green garage. Police cars follow the roads and can damage your vehicle; five hits end the mission. You can leave a car and enter another one.
+
+| Action | Sensor / key |
+| --- | --- |
+| Walk / steer | Tilt left/right and forward/back, or `W`/`A`/`S`/`D` / arrow keys |
+| Enter / leave a nearby car | `E` |
+| Brake / handbrake | Tilt back or press `S`; hold `Space` for a tighter turn |
+| Set neutral position | Hold the controller comfortably and press `C` |
+| Pause / resume | `P` |
+| Restart | `R`, or `Enter` after a mission ends |
+| Mute / unmute | `M` |
+| Quit | `Esc` |
+
+On foot, tilt moves in two dimensions. In a car, forward/back controls acceleration and braking while left/right steers. The `E` and `Space` actions use the keyboard because the existing MPU6050 controller has no buttons. Neon City Escape draws the city, cars, and minimap in Pygame; the preview image is not required to play.
+
 The game reads USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` about 50 times per second, and the game sends `C` to reset the tilt center. Its left/right roll direction is reversed with `ROLL_DIRECTION = -1.0` in the sketch. The game reconnects automatically if the board is unplugged and reconnected.
 
 ## Troubleshooting
@@ -89,4 +108,4 @@ The game reads USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<
 | Controls are backward | Use `--invert-roll` or `--invert-pitch`. |
 | Python says `No module named pygame` | Activate the virtual environment and run `python -m pip install -r requirements.txt`. |
 
-No Wi-Fi setup is needed. Both games draw their graphics with Pygame.
+No Wi-Fi setup is needed. All three games draw their graphics with Pygame.
