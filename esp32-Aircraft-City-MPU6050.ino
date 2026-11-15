@@ -13,6 +13,9 @@ float filteredRoll = 0.0f;
 float filteredPitch = 0.0f;
 float centerRoll = 0.0f;
 float centerPitch = 0.0f;
+float yawRate = 0.0f;
+float yawBias = 0.0f;
+float shock = 0.0f;
 unsigned long lastSample = 0;
 bool initialized = false;
 
@@ -23,6 +26,9 @@ void sampleTilt() {
   const float ax = accel.acceleration.x;
   const float ay = accel.acceleration.y;
   const float az = accel.acceleration.z;
+  const float magnitude = sqrtf(ax * ax + ay * ay + az * az);
+  shock = fabsf(magnitude - 9.81f);
+  yawRate = gyro.gyro.z * 180.0f / PI;
   const float roll = atan2f(ay, az) * 180.0f / PI;
   const float pitch = atan2f(-ax, sqrtf(ay * ay + az * az)) * 180.0f / PI;
 
@@ -52,12 +58,15 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   // Hold the controller in its neutral position while it powers up.
+  float yawSum = 0.0f;
   for (int i = 0; i < 30; ++i) {
     sampleTilt();
+    yawSum += yawRate;
     delay(20);
   }
   centerRoll = filteredRoll;
   centerPitch = filteredPitch;
+  yawBias = yawSum / 30.0f;
   Serial.println("READY,MPU6050");
 }
 
@@ -67,6 +76,7 @@ void loop() {
     if (command == 'C' || command == 'c') {
       centerRoll = filteredRoll;
       centerPitch = filteredPitch;
+      yawBias = yawRate;
       Serial.println("CENTERED");
     }
   }
@@ -76,9 +86,22 @@ void loop() {
   lastSample = now;
   sampleTilt();
 
-  // Machine-readable protocol: IMU,roll_degrees,pitch_degrees
+  const float rollDelta = ROLL_DIRECTION * (filteredRoll - centerRoll);
+  const float pitchDelta = filteredPitch - centerPitch;
+
+  // Legacy packet keeps Skyline Flight, Orbital Salvage, and Neon City Escape working.
   Serial.print("IMU,");
-  Serial.print(ROLL_DIRECTION * (filteredRoll - centerRoll), 2);
+  Serial.print(rollDelta, 2);
   Serial.print(',');
-  Serial.println(filteredPitch - centerPitch, 2);
+  Serial.println(pitchDelta, 2);
+
+  // Full motion packet: tilt, twist rate (degrees/s), and shake strength (m/s^2).
+  Serial.print("MOTION,");
+  Serial.print(rollDelta, 2);
+  Serial.print(',');
+  Serial.print(pitchDelta, 2);
+  Serial.print(',');
+  Serial.print(yawRate - yawBias, 2);
+  Serial.print(',');
+  Serial.println(shock, 2);
 }

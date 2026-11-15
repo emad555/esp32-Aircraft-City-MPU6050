@@ -55,6 +55,19 @@ def parse_imu(line: str) -> tuple[float, float] | None:
     return clamp(roll, -45, 45), clamp(pitch, -45, 45)
 
 
+def parse_motion(line: str) -> tuple[float, float, float, float] | None:
+    parts = line.strip().split(",")
+    if len(parts) != 5 or parts[0] != "MOTION":
+        return None
+    try:
+        roll, pitch, yaw_rate, shock = map(float, parts[1:])
+    except ValueError:
+        return None
+    if not all(math.isfinite(value) for value in (roll, pitch, yaw_rate, shock)):
+        return None
+    return clamp(roll, -45, 45), clamp(pitch, -45, 45), clamp(yaw_rate, -500, 500), clamp(shock, 0, 40)
+
+
 class GameAudio:
     """Small synthesized effects; no downloaded sound files are needed."""
 
@@ -140,7 +153,10 @@ class TiltController:
         self.buffer = bytearray()
         self.roll = 0.0
         self.pitch = 0.0
+        self.yaw_rate = 0.0
+        self.shock = 0.0
         self.last_packet = 0.0
+        self.last_motion = 0.0
         self.next_connect = 0.0
         self.message = "Searching for ESP32"
 
@@ -155,6 +171,7 @@ class TiltController:
 
     def update(self) -> None:
         now = time.monotonic()
+        self.shock = 0.0  # Latch the largest shake in the packets received this frame.
         if self.connection is None:
             if now < self.next_connect or serial is None:
                 return
@@ -187,10 +204,18 @@ class TiltController:
                         self.roll, self.pitch = sample
                         self.last_packet = now
                         self.message = f"MPU6050 live on {self.port_name}"
+                    elif (motion := parse_motion(line)) is not None:
+                        self.roll, self.pitch, self.yaw_rate, peak = motion
+                        self.shock = max(self.shock, peak)
+                        self.last_packet = now
+                        self.last_motion = now
+                        self.message = f"MPU6050 motion live on {self.port_name}"
                     elif line.startswith("ERROR,"):
                         self.message = line.strip()
+            if self.last_motion and now - self.last_motion > 0.5:
+                self.yaw_rate = 0.0
             if self.last_packet and now - self.last_packet > 1.0:
-                self.roll = self.pitch = 0.0
+                self.roll = self.pitch = self.yaw_rate = 0.0
                 self.message = f"Waiting for MPU6050 on {self.port_name}"
         except (OSError, serial.SerialException):
             self.close()
@@ -200,6 +225,10 @@ class TiltController:
     @property
     def live(self) -> bool:
         return self.connection is not None and time.monotonic() - self.last_packet < 0.5
+
+    @property
+    def motion_live(self) -> bool:
+        return self.live and time.monotonic() - self.last_motion < 0.5
 
     def center(self) -> None:
         if self.connection is not None:
@@ -214,7 +243,8 @@ class TiltController:
             self.connection.close()
             self.connection = None
         self.last_packet = 0.0
-        self.roll = self.pitch = 0.0
+        self.last_motion = 0.0
+        self.roll = self.pitch = self.yaw_rate = self.shock = 0.0
 
 
 @dataclass
