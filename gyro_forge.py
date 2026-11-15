@@ -375,7 +375,8 @@ def main() -> None:
             controller.update()
             keys = pygame.key.get_pressed()
             tilt_x = deadzone(controller.roll) * (-1 if args.invert_roll else 1) if controller.live else 0.0
-            tilt_y = -deadzone(controller.pitch) * (-1 if args.invert_pitch else 1) if controller.live else 0.0
+            # Gyro Forge uses the opposite pitch direction from the earlier games.
+            tilt_y = deadzone(controller.pitch) * (-1 if args.invert_pitch else 1) if controller.live else 0.0
             yaw = controller.yaw_rate * (-1 if args.invert_yaw else 1) if controller.motion_live else 0.0
             if controller.motion_live and controller.shock >= args.shake_threshold:
                 if game.status != "playing":

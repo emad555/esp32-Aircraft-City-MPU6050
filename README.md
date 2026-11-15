@@ -1,6 +1,6 @@
 # ESP32 + MPU6050 tilt games
 
-Four desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city. **Orbital Salvage** is a top-down arena collection game. **Neon City Escape** is a driving mission with a police chase. **Gyro Forge** is built around the motion sensor itself: tilt changes a ball's gravity, twisting turns a shield, and shaking sends out a defensive pulse. All four games also have keyboard controls.
+Five desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** is an aircraft run through a city. **Orbital Salvage** is a top-down arena collection game. **Neon City Escape** is a driving mission with a police chase. **Gyro Forge** uses tilt as gravity, twist to turn a shield, and shake for a defensive pulse. **Prism Sync 3D** uses the full motion sensor to align a rotating 3D cube with a target pose, then lock it with a shake. All five games also have keyboard controls.
 
 | Skyline Flight | Orbital Salvage |
 | --- | --- |
@@ -9,6 +9,8 @@ Four desktop games use the same ESP32 + MPU6050 controller. **Skyline Flight** i
 ![Neon City Escape preview](city-escape-preview.png)
 
 ![Gyro Forge preview](gyro-forge-preview.png)
+
+![Prism Sync 3D preview](prism-sync-preview.png)
 
 ## Hardware and wiring
 
@@ -28,7 +30,7 @@ Use **3.3 V** so the I2C lines stay safe for the ESP32. For another ESP32 varian
 1. Install Arduino IDE and the **esp32 by Espressif Systems** board package.
 2. In Library Manager install **Adafruit MPU6050** and **Adafruit Unified Sensor**. Install **Adafruit BusIO** if prompted.
 3. Open `esp32-Aircraft-City-MPU6050.ino`, select your board and USB port, and upload.
-4. Keep the controller level and still for the first second after reset. You may verify `READY,MPU6050`, `IMU,roll,pitch`, and `MOTION,roll,pitch,yaw,shock` lines in Serial Monitor at **115200 baud**. **Close Serial Monitor before starting a game**, because only one program can own the port. Re-upload this updated sketch to use Gyro Forge's twist and shake controls.
+4. Keep the controller level and still for the first second after reset. You may verify `READY,MPU6050`, `IMU,roll,pitch`, and `MOTION,roll,pitch,yaw,shock` lines in Serial Monitor at **115200 baud**. **Close Serial Monitor before starting a game**, because only one program can own the port. Re-upload this updated sketch to use Gyro Forge's and Prism Sync 3D's twist and shake controls.
 
 ## Run the games
 
@@ -41,7 +43,7 @@ python -m pip install -r requirements.txt
 python game.py
 ```
 
-Run `python salvage.py` for Orbital Salvage, `python city_escape.py` for Neon City Escape, or `python gyro_forge.py` for Gyro Forge. All four games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
+Run `python salvage.py` for Orbital Salvage, `python city_escape.py` for Neon City Escape, `python gyro_forge.py` for Gyro Forge, or `python prism_sync.py` for Prism Sync 3D. All five games use the same sketch and dependencies. Run one game at a time because the USB serial port can only be opened by one program.
 
 If auto-detection does not find your ESP32, specify its port (look in Arduino IDE or Windows Device Manager):
 
@@ -49,7 +51,7 @@ If auto-detection does not find your ESP32, specify its port (look in Arduino ID
 python game.py --port COM5
 ```
 
-Use `python salvage.py --port COM5`, `python city_escape.py --port COM5`, or `python gyro_forge.py --port COM5` for the other games. All four accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
+Use `python salvage.py --port COM5`, `python city_escape.py --port COM5`, `python gyro_forge.py --port COM5`, or `python prism_sync.py --port COM5` for the other games. All five accept `--invert-roll` and `--invert-pitch` if the controller is mounted in the opposite direction.
 
 On Linux or macOS, use `python3 -m venv .venv`, activate with `source .venv/bin/activate`, and pass a port such as `/dev/ttyUSB0` or `/dev/cu.usbserial-...` if needed. Python 3.10 or newer is recommended.
 
@@ -115,7 +117,26 @@ Collect 12 gold crystals in 90 seconds. Tilting the MPU6050 accelerates the ball
 
 If twist feels reversed, add `--invert-yaw`. If shakes are too hard or too easy to trigger, adjust `--shake-threshold`, for example `python gyro_forge.py --shake-threshold 3.0`. The bottom of the screen shows live roll, pitch, twist rate, and shake strength to help tune it. Keyboard controls remain available when the sensor is disconnected.
 
-The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` and `MOTION,<roll degrees>,<pitch degrees>,<yaw degrees/second>,<shake m/s²>` about 50 times per second. The `IMU` packet keeps the first three games compatible; Gyro Forge reads the extra motion values. Sending `C` resets tilt center and gyro bias. The sketch's left/right roll direction is reversed with `ROLL_DIRECTION = -1.0`. The games reconnect automatically if the board is unplugged and reconnected.
+Gyro Forge's default sensor up/down direction was flipped after feedback. If you prefer the previous direction, launch it with `--invert-pitch`.
+
+## Play Prism Sync 3D
+
+The cyan cube follows the MPU6050's roll and pitch. Twist the board in its own plane to turn the cube around its third axis. Match the gold target cube on all three axes, then shake to lock the pose. Synchronize six poses before the 105-second timer runs out. The axis guides show the current and target angles; each guide turns green when it is close enough. A missed shake costs one second. Shake after a win or loss to restart.
+
+| Action | MPU6050 / keyboard |
+| --- | --- |
+| Rotate around the first two axes | Tilt left/right and forward/back / `W` `A` `S` `D` or arrows |
+| Rotate around the third axis | Twist the board / `Q` and `E` |
+| Lock the current pose | Shake the board / `Space` |
+| Recenter tilt and gyro bias | Hold the board level and still, then press `C` |
+| Pause / resume | `P` |
+| Restart | Shake after game over, `R`, or `Enter` after game over |
+| Mute / unmute | `M` |
+| Quit | `Esc` |
+
+Run `python prism_sync.py`. Use `--invert-yaw` if the twist direction feels backward, or adjust `--shake-threshold 3.0` if needed. The 3D cubes are projected and drawn by Pygame; no extra graphics library is required.
+
+The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` and `MOTION,<roll degrees>,<pitch degrees>,<yaw degrees/second>,<shake m/s²>` about 50 times per second. The `IMU` packet keeps the first three games compatible; Gyro Forge and Prism Sync 3D read the extra motion values. Sending `C` resets tilt center and gyro bias. The sketch's left/right roll direction is reversed with `ROLL_DIRECTION = -1.0`. The games reconnect automatically if the board is unplugged and reconnected.
 
 ## Troubleshooting
 
@@ -125,8 +146,8 @@ The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<
 | Sketch reports MPU6050 not found | Recheck 3V3, GND, SDA 21, SCL 22; ensure the board and module share ground. |
 | Aircraft drifts | Hold the controller neutral and press `C`. |
 | Controls are backward | Use `--invert-roll` or `--invert-pitch`. |
-| Gyro Forge has tilt but no twist or shake | Re-upload the updated sketch and check for `MOTION,...` lines in Serial Monitor, then close the monitor. |
+| Gyro Forge or Prism Sync 3D has tilt but no twist or shake | Re-upload the updated sketch and check for `MOTION,...` lines in Serial Monitor, then close the monitor. |
 | Shake pulse triggers too often or not at all | Watch the shake value at the bottom of Gyro Forge and adjust `--shake-threshold`. |
 | Python says `No module named pygame` | Activate the virtual environment and run `python -m pip install -r requirements.txt`. |
 
-No Wi-Fi setup is needed. All four games draw their graphics with Pygame.
+No Wi-Fi setup is needed. All five games draw their graphics with Pygame.
