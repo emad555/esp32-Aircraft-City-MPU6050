@@ -140,7 +140,7 @@ Run `python prism_sync.py`. Use `--invert-yaw` if the twist direction feels back
 
 ## Play Flappy MPU
 
-Shake the controller once to start and flap. Time further shakes to fly through the openings in the green pipes. Tilt forward/back to adjust how quickly the bird falls, and tilt left/right to move it a short distance horizontally. A gold feather appears in every fourth pipe opening; collecting it gives a one-hit shield and two bonus points. After a crash, shake again to restart.
+Shake the controller once to start and flap. Time further shakes to fly through the openings in the green pipes. Tilt up to slow a fall or lift gently; tilt down to dive. Tilt left/right to move a short distance horizontally. A gold feather appears in every fourth pipe opening; collecting it gives a one-hit shield and two bonus points. After a crash, shake again to restart.
 
 | Action | MPU6050 / keyboard |
 | --- | --- |
@@ -152,7 +152,7 @@ Shake the controller once to start and flap. Time further shakes to fly through 
 | Mute / unmute | `M` |
 | Quit | `Esc` |
 
-Run `python flappy_imu.py`. The `--shake-threshold` option changes how strong a shake is needed, for example `python flappy_imu.py --shake-threshold 3.0`. Flappy MPU uses the newer `MOTION,...` serial packet for shake detection; the keyboard fallback still works without an ESP32.
+Run `python flappy_imu.py`. The bottom of the screen shows the received pitch angle, an up/down marker, and the current `LIFT`, `LEVEL`, or `DIVE` state. If the direction is reversed on your board, add `--invert-pitch`. The `--shake-threshold` option changes how strong a shake is needed, for example `python flappy_imu.py --shake-threshold 3.0`. Flappy MPU uses the newer `MOTION,...` serial packet for shake detection; the keyboard fallback still works without an ESP32.
 
 The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<pitch degrees>` and `MOTION,<roll degrees>,<pitch degrees>,<yaw degrees/second>,<shake m/s²>` about 50 times per second. The `IMU` packet keeps the first three games compatible; Gyro Forge, Prism Sync 3D, and Flappy MPU read the extra motion values. Sending `C` resets tilt center and gyro bias. The sketch's left/right roll direction is reversed with `ROLL_DIRECTION = -1.0`. The games reconnect automatically if the board is unplugged and reconnected.
 
@@ -164,6 +164,7 @@ The games read USB serial at 115200 baud. The sketch sends `IMU,<roll degrees>,<
 | Sketch reports MPU6050 not found | Recheck 3V3, GND, SDA 21, SCL 22; ensure the board and module share ground. |
 | Aircraft drifts | Hold the controller neutral and press `C`. |
 | Controls are backward | Use `--invert-roll` or `--invert-pitch`. |
+| Flappy MPU up/down tilt seems inactive | Check whether the pitch number and marker at the bottom move; press `C` while level to recenter. If the marker moves in the opposite direction, use `--invert-pitch`. |
 | A motion game has tilt but no twist or shake | Re-upload the updated sketch and check for `MOTION,...` lines in Serial Monitor, then close the monitor. |
 | Shake pulse triggers too often or not at all | Watch the shake value at the bottom of Gyro Forge and adjust `--shake-threshold`. |
 | Python says `No module named pygame` | Activate the virtual environment and run `python -m pip install -r requirements.txt`. |

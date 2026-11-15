@@ -50,6 +50,13 @@ def circle_hits_rect(x: float, y: float, radius: float, rect: pygame.Rect) -> bo
     return (x - nearest_x) ** 2 + (y - nearest_y) ** 2 < radius ** 2
 
 
+def pitch_axis(degrees: float) -> float:
+    """Make a small physical tilt visible without amplifying one-degree jitter."""
+    if abs(degrees) <= 1.0:
+        return 0.0
+    return clamp(math.copysign((abs(degrees) - 1.0) / 14.0, degrees), -1.0, 1.0)
+
+
 class FlappyGame:
     def __init__(self, seed: int | None = None) -> None:
         self.rng = random.Random(seed)
@@ -60,6 +67,7 @@ class FlappyGame:
         self.x = 260.0
         self.y = 350.0
         self.vy = 0.0
+        self.glide_input = 0.0
         self.score = 0
         self.passed = 0
         self.shield = 0
@@ -109,6 +117,7 @@ class FlappyGame:
             return
         self.elapsed += dt
         roll, pitch = clamp(roll, -1, 1), clamp(pitch, -1, 1)
+        self.glide_input = pitch
         desired_x = 260 + 95 * roll
         self.x += (desired_x - self.x) * min(1.0, 6.0 * dt)
 
@@ -131,8 +140,14 @@ class FlappyGame:
         if flap:
             self._flap()
 
-        gravity = 840 + 210 * pitch  # Positive pitch now means a steeper downward glide.
+        gravity = 770 + 420 * pitch
         self.vy = min(530.0, self.vy + gravity * dt)
+        if pitch < -0.15:
+            # Up tilt immediately brakes a fall; a strong tilt can lift slowly.
+            self.vy = min(self.vy, 230 + 370 * pitch)
+        elif pitch > 0.15:
+            # Down tilt commits to a dive rather than waiting for gravity to build speed.
+            self.vy = max(self.vy, 175 * pitch)
         self.y += self.vy * dt
         self.trail.append((self.x, self.y))
         self.trail = self.trail[-24:]
@@ -256,6 +271,9 @@ class Renderer:
         pygame.draw.rect(surface, (117, 212, 135), (0, GROUND, WIDTH, 7))
         for x in range(0, WIDTH, 47):
             pygame.draw.rect(surface, (58, 141, 101), (x, GROUND + 29, 24, 5))
+        footer = pygame.Surface((WIDTH, HEIGHT - GROUND - 10), pygame.SRCALPHA)
+        footer.fill((8, 37, 51, 210))
+        surface.blit(footer, (0, GROUND + 10))
 
         hud = pygame.Surface((WIDTH, 76), pygame.SRCALPHA)
         hud.fill((8, 31, 55, 206))
@@ -275,6 +293,17 @@ class Renderer:
         surface.blit(self.small.render(sensor, True, WHITE), (26, HEIGHT - 56))
         surface.blit(self.small.render("C CENTER   P PAUSE   R RESTART   M MUTE   ESC QUIT", True, WHITE),
                      (585, HEIGHT - 56))
+        glide = "LIFT" if game.glide_input < -0.15 else ("DIVE" if game.glide_input > 0.15 else "LEVEL")
+        raw_pitch = f"{controller.pitch:+.1f}°" if controller and controller.live else "KEYS"
+        surface.blit(self.small.render(f"PITCH {raw_pitch}   {glide}", True,
+                                       CYAN if glide == "LIFT" else GOLD if glide == "DIVE" else WHITE),
+                     (26, HEIGHT - 27))
+        pygame.draw.rect(surface, (40, 83, 91), (255, HEIGHT - 23, 220, 8), border_radius=4)
+        pygame.draw.line(surface, WHITE, (365, HEIGHT - 27), (365, HEIGHT - 11), 2)
+        marker_x = round(365 + game.glide_input * 104)
+        pygame.draw.circle(surface, CYAN if glide == "LIFT" else GOLD if glide == "DIVE" else WHITE,
+                           (marker_x, HEIGHT - 19), 7)
+        surface.blit(self.small.render("UP  <  LEVEL  >  DOWN", True, MUTED), (492, HEIGHT - 27))
 
         if game.status == "ready" or game.status == "over" or game.paused:
             shade = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
@@ -289,7 +318,7 @@ class Renderer:
                 detail = "Shake the MPU6050 or press Space to flap"
             line = self.title.render(detail, True, CYAN)
             surface.blit(line, line.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 5)))
-            help_text = "Tilt forward/back to glide; left/right to steer" if not game.paused else "Press P to resume"
+            help_text = "Tilt up to lift, down to dive; left/right to steer" if not game.paused else "Press P to resume"
             help_line = self.small.render(help_text, True, WHITE)
             surface.blit(help_line, help_line.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 55)))
 
@@ -338,7 +367,7 @@ def main() -> None:
             controller.update()
             keys = pygame.key.get_pressed()
             roll = deadzone(controller.roll) * (-1 if args.invert_roll else 1) if controller.live else 0.0
-            pitch = deadzone(controller.pitch) * (-1 if args.invert_pitch else 1) if controller.live else 0.0
+            pitch = pitch_axis(controller.pitch) * (-1 if args.invert_pitch else 1) if controller.live else 0.0
             if keys[pygame.K_a] or keys[pygame.K_LEFT]:
                 roll = -1.0
             if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
